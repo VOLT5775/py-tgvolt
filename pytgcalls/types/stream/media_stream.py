@@ -320,3 +320,53 @@ class MediaStream(Stream):
             key=lambda flag: flag.value,
         )
         return flags & ~combined_flags_value | potential_flag
+        
+        
+        
+class FastMediaStream(Stream):
+    def __init__(
+        self,
+        media_path: str,
+        audio_parameters=AudioQuality.STUDIO,
+        video_parameters=VideoQuality.SD_480p,
+        ffmpeg_parameters: str = None,
+        headers: Dict[str, str] = None,
+        with_video: bool = False
+    ):
+        if isinstance(audio_parameters, AudioQuality):
+            audio_parameters = AudioParameters(*audio_parameters.value)
+
+        if isinstance(video_parameters, VideoQuality):
+            video_parameters = VideoParameters(*video_parameters.value, adjust_by_height=False)
+
+        # ⚡ نبني ffmpeg مباشرة بدون checks
+        audio_cmd = list_to_cmd(
+            build_command(
+                "ffmpeg",
+                ffmpeg_parameters,
+                media_path,
+                audio_parameters,
+                [],
+                headers,
+                False,
+            )
+        )
+
+        video_cmd = None
+        if with_video:
+            video_cmd = list_to_cmd(
+                build_command(
+                    "ffmpeg",
+                    ffmpeg_parameters,
+                    media_path,
+                    video_parameters,
+                    [],
+                    headers,
+                    False,
+                )
+            )
+
+        super().__init__(
+            microphone=AudioStream(MediaSource.SHELL, audio_cmd, audio_parameters),
+            camera=VideoStream(MediaSource.SHELL, video_cmd, video_parameters) if with_video else None
+        )
