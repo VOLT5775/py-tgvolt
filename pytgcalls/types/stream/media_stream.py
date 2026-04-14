@@ -327,46 +327,30 @@ class FastMediaStream(Stream):
     def __init__(
         self,
         media_path: str,
-        audio_parameters=AudioQuality.STUDIO,
-        video_parameters=VideoQuality.SD_480p,
-        ffmpeg_parameters: str = None,
-        headers: Dict[str, str] = None,
         with_video: bool = False
     ):
-        if isinstance(audio_parameters, AudioQuality):
-            audio_parameters = AudioParameters(*audio_parameters.value)
-
-        if isinstance(video_parameters, VideoQuality):
-            video_parameters = VideoParameters(*video_parameters.value, adjust_by_height=False)
-
-        # ⚡ نبني ffmpeg مباشرة بدون checks
-        audio_cmd = list_to_cmd(
-            build_command(
-                "ffmpeg",
-                ffmpeg_parameters,
-                media_path,
-                audio_parameters,
-                [],
-                headers,
-                False,
-            )
+        # ⚡ ffmpeg مباشر (أسرع شيء ممكن)
+        audio_cmd = (
+            f"ffmpeg -loglevel quiet -re -i '{media_path}' "
+            f"-f s16le -ac 2 -ar 48000 pipe:1"
         )
 
         video_cmd = None
         if with_video:
-            video_cmd = list_to_cmd(
-                build_command(
-                    "ffmpeg",
-                    ffmpeg_parameters,
-                    media_path,
-                    video_parameters,
-                    [],
-                    headers,
-                    False,
-                )
+            video_cmd = (
+                f"ffmpeg -loglevel quiet -re -i '{media_path}' "
+                f"-f rawvideo -r 25 -pix_fmt yuv420p pipe:1"
             )
 
         super().__init__(
-            microphone=AudioStream(MediaSource.SHELL, audio_cmd, audio_parameters),
-            camera=VideoStream(MediaSource.SHELL, video_cmd, video_parameters) if with_video else None
+            microphone=AudioStream(
+                MediaSource.SHELL,
+                audio_cmd,
+                AudioParameters(48000, 2)
+            ),
+            camera=VideoStream(
+                MediaSource.SHELL,
+                video_cmd,
+                VideoParameters(640, 360, 25)
+            ) if with_video else None
         )
